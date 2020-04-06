@@ -89,10 +89,22 @@ v.2.4.1](http://catchenlab.life.illinois.edu/stacks/). We are using the
 `ref_map.pl` script to build a catalog with referenced aligned reads.
 
 ``` bash
-ref_map.pl -T 4 --samples ./04.bam_alignments/ -o ./05.Stacks --popmap ./popmap_2_biogeography.txt
+ref_map.pl -T 4 --samples ./04.bam_alignments/ -o ./05.Stacks --popmap ./popmap_biogeography.txt
 ```
 
 ### Population genomics and phylogenetics analyses
 
 From this point onward, we are filtering and generating datasets for
 different analyses.
+
+#### Generate a vcf file using [populations](http://catchenlab.life.illinois.edu/stacks/comp/populations.php)
+
+Here we are telling `populations` to retain loci only if present in at
+least 80% of individuals per population in at least 9 populations. We
+are also removing loci with heterozygosity higher than 0.6 and minor
+allele frequency below 0.05. Only one snp per locus is retained to
+reduce the effect of linkage.
+
+``` bash
+populations -P ./05.Stacks -M ./popmap_biogeography2.txt -t 4 -p 9 -r 0.8 --max_obs_het 0.6 --min_maf 0.05 --write_single_snp --vcf
+```
