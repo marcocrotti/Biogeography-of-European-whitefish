@@ -1,35 +1,78 @@
 Biogeography of European whitefish
 ================
 Marco Crotti
-06/04/2020
+06 April, 2020
 
-## R Markdown
+## Pipeline for UK whitefish biogeography project using ddRADseq
 
-This is an R Markdown document. Markdown is a simple formatting syntax
-for authoring HTML, PDF, and MS Word documents. For more details on
-using R Markdown see <http://rmarkdown.rstudio.com>.
+### Set up working environment
 
-When you click the **Knit** button a document will be generated that
-includes both content as well as the output of any embedded R code
-chunks within the document. You can embed an R code chunk like this:
+Let’s create the folders that are going to contain the output data from
+all the pipeline components.
 
-``` r
-summary(cars)
+``` bash
+mkdir ./Desktop/biogeography
+mkdir ./Desktop/biogeography/00.Raw_reads ./Desktop/biogeography/01.Demultiplexed_reads ./Desktop/biogeography/02.Trimmomatic_filtering ./Desktop/biogeography/03.Assembly ./Desktop/biogeography/04.bam_alignments ./Desktop/biogeography/05.Stacks ./Desktop/biogeography/06.Phylogenetics ./Desktop/biogeography/07.Population_genetics
 ```
 
-    ##      speed           dist       
-    ##  Min.   : 4.0   Min.   :  2.00  
-    ##  1st Qu.:12.0   1st Qu.: 26.00  
-    ##  Median :15.0   Median : 36.00  
-    ##  Mean   :15.4   Mean   : 42.98  
-    ##  3rd Qu.:19.0   3rd Qu.: 56.00  
-    ##  Max.   :25.0   Max.   :120.00
+#### 01\. Demultiplex raw reads
 
-## Including Plots
+Use
+[process\_radtags](http://catchenlab.life.illinois.edu/stacks/comp/process_radtags.php)
+to demultiplex Illumina raw data.
 
-You can also embed plots, for example:
+``` bash
+process_radtags -P -c -q -r -p ./00.Raw_reads/ -o ./01.Demultiplexed_reads -b ./biogeography_barcodes.txt --inline_inline -i gzfastq -y gzfastq --renz_1 pstI --renz_2 mspI -t 65
+```
 
-![](biogeography_whitefish_files/figure-gfm/pressure-1.png)<!-- -->
+#### 02\. [Trimmomatic](http://www.usadellab.org/cms/?page=trimmomatic) filtering
 
-Note that the `echo = FALSE` parameter was added to the code chunk to
-prevent printing of the R code that generated the plot.
+Remove the first 5 bp and 3 bp from the forward and reverse reads to
+remove the enzyme cut site, single end reads.
+
+``` bash
+# Forward reads
+for infile in ./01.Demultiplexed_reads/*.1.fq.gz
+do
+base=$(basename $infile .fq.gz)
+java -jar /usr/local/bin/trimmomatic-0.38.jar SE -threads 4 $infile ./02.Trimmomatic_filtering/$base.fq.gz HEADCROP:5
+done
+
+# Reverse reads
+for infile in ./01.Demultiplexed_reads/*.2.fq.gz
+do
+base=$(basename $infile .fq.gz)
+java -jar /usr/local/bin/trimmomatic-0.38.jar SE -threads 4 $infile ./02.Trimmomatic_filtering/$base.fq.gz HEADCROP:3
+done
+```
+
+Do paired-end filtering.
+
+``` bash
+for R1 in *.1.fq.gz
+do
+R2=${R1//1.fq.gz/2.fq.gz}
+R1paired=${R1//.1.fq.gz/.P1.fq.gz}
+R1unpaired=${R1//.1.fq.gz/.U1.fq.gz}    
+R2paired=${R2//.2.fq.gz/.P2.fq.gz}
+R2unpaired=${R2//.2.fq.gz/.U2.fq.gz}
+echo "$R1 $R2"
+java -jar /usr/local/bin/trimmomatic-0.38.jar PE -threads 4 -phred33 $R1 $R2 ./02.Trimmomatic_filtering/$R1paired $R1unpaired ./02.Trimmomatic_filtering/$R2paired $R2unpaired LEADING:20 TRAILING:20 MINLEN:60
+done
+```
+
+#### 03\. Align to European whitefish genome assembly
+
+We are using [bwa](http://bio-bwa.sourceforge.net/) aligner for short
+reads.
+
+``` bash
+for R1 in ./02.Trimmomatic_filtering/*.P1.fq.gz
+do
+R2=${R1//.P1.fq.gz/.P2.fq.gz}
+base=$(basename $R1 .P1.fq.gz)
+echo "$base"
+bwa mem -t 4 /03.Assembly/EW_assembly.fa $R1 $R2 | samtools view -bSq 20 | \
+samtools sort -o ./4.bam_alignments/$base.bam
+done
+```
