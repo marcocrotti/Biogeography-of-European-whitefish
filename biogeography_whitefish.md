@@ -136,3 +136,98 @@ vcftools --vcf ./5.Stacks_ref2/filtered.hwe.recode.vcf --missing-indv
 mawk '$5 > 0.9' out.imiss | cut -f1 > lowDP.indv
 vcftools --vcf ./05.Stacks/filtered.hwe.maf5.recode.vcf --remove lowDP.indv --recode --recode-INFO-all --out ./05.Stacks/filtered.final.maf5
 ```
+
+We now generated the final vcf file, with 91 individuals and 25,751 high
+quality SNPs.
+
+#### Convert the vcf file to phylip
+
+Here we are converting the final vcf file to phylip format to be
+analysed with
+[RAxML](https://cme.h-its.org/exelixis/web/software/raxml/) on the
+[CIPRES](https://www.phylo.org/) server. For the format conversion we
+use the `vcf2phylip.py` script (Ortiz, 2019), found
+[here](https://github.com/edgardomortiz/vcf2phylip).
+
+``` bash
+cd ./Desktop/biogeography/06.Phylogenetics
+python vcf2phylip.py --input filtered.final.maf5.recode.vcf 
+```
+
+#### Admxiture analysis
+
+Here we are converting the final vcf file to
+[plink](zzz.bwh.harvard.edu/plink/) *bed* format to be used in
+[Admixture](http://software.genetics.ucla.edu/admixture/).
+
+``` bash
+plink --vcf ./05.Stacks/filtered.final.maf5.recode.vcf --double-id --allow-extra-chr --make-bed --out ./07.Population_genetics/admixture/filtered.final
+
+plink --bfile ./07.Population_genetics/admixture/filtered.final --double-id --allow-extra-chr --recode12 --tab --out ./07.Population_genetics/admixture/filtered.final
+```
+
+Now we can run the **admixture** analysis. First, write a loop script to
+test different values of *K*. You can use any text editor. The script
+looks like this:
+
+``` bash
+#!/bin/bash
+
+for K in {2..11}
+do
+admixture --cv=20 $@ $K | tee log${K}.out;
+mv *.P ./results;
+mv *.Q ./results;
+mv *.out ./results;
+done
+```
+
+Now run the analysis.
+
+``` bash
+cd ./07.Population_genetics/admixture
+sh ./run_admixture_loop.sh filtered.final.ped
+grep -h CV ./results/log*.out
+```
+
+#### DAPC analysis in adegenet
+
+First, we need to convert the final vcf file into plink 012 format.
+
+``` bash
+plink --vcf ./05.Stacks/filtered.final.maf5.recode.vcf --make-bed --out ./07.Population_genetics/DAPC/filtered.maf5 --allow-extra-chr 
+
+plink --bfile ./07.Population_genetics/DAPC/iltered.maf5 --recode --tab --out ./07.Population_genetics/DAPC/filtered.maf5 --allow-extra-chr 
+
+plink --file ./07.Population_genetics/DAPC/filtered.maf5 --recodeA --out ./07.Population_genetics/DAPC/filtered.maf5 --allow-extra-chr 
+
+plink --file ./07.Population_genetics/DAPC/filtered.maf5 --recode12 --out ./07.Population_genetics/DAPC/filtered.maf5.12 --double-id --allow-extra-chr
+```
+
+Now we can run the
+[DAPC](http://adegenet.r-forge.r-project.org/files/tutorial-dapc.pdf)
+analysis in the R package adegenet.
+
+``` r
+setwd("~/Desktop/biogeography/07.Population_genetics/DAPC/")
+library(adegenet)
+genlight1 <- read.PLINK("filtered.maf5.raw", map.file="filtered.maf5.map")
+
+groups <- find.clusters(genlight1, max.n.clust=11, n.pca = 90,
+                        choose.n.clust = TRUE, criterion = "min")  # find most likely number of clusters
+
+xval1 <- xvalDapc(tab(genlight1, NA.method="mean"), groups$grp, n.pca.max = 90,
+                  result = "groupMean", center = TRUE, scale = FALSE, parallel = "multicore",
+                  n.pca = NULL, n.rep = 100, xval.plot = TRUE)  # crossalidation to decide how many pcs to retain
+
+dapc1 <- dapc(genlight1, pop = groups$grp, n.pca=10, n.da = 7)  # run dapc
+
+# plot the results
+posterior1 <- data.frame(dapc1$posterior)
+colnames(posterior1) <- c("alp","lte","lom","haw","nor","bwa","bal")
+cols <- c("alp"="#874000","lte"="gold1","lom"="#2372CD","haw"="#DC8C91","nor"="#b08ea2","bwa"="#e3655b","bal"="#6b9080")
+
+barplot(t(posterior1), col = cols, space = 0,
+        xlab="Lake", ylab="Ancestry", border=NA,cex.names = 0.000001)
+# the colours were then adjusted in inkscape manually!
+```
