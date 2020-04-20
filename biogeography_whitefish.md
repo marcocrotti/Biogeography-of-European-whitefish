@@ -1,7 +1,7 @@
 Biogeography of European whitefish
 ================
 Marco Crotti
-14 April, 2020
+20 April, 2020
 
 ## Pipeline for UK whitefish biogeography project using ddRADseq
 
@@ -140,6 +140,16 @@ vcftools --vcf ./05.Stacks/filtered.hwe.maf5.recode.vcf --remove lowDP.indv --re
 We now generated the final vcf file, with 91 individuals and 25,751 high
 quality SNPs.
 
+#### Genetic diversity and allelic richness
+
+##### Genetic diversity
+
+##### Allelic richness
+
+``` bash
+cd ~/Desktop/biogeography/7.Population_genetics/genetic_diversity
+```
+
 #### Convert the vcf file to phylip
 
 Here we are converting the final vcf file to phylip format to be
@@ -231,3 +241,26 @@ barplot(t(posterior1), col = cols, space = 0,
         xlab="Lake", ylab="Ancestry", border=NA,cex.names = 0.000001)
 # the colours were then adjusted in inkscape manually!
 ```
+
+#### fineRADstructure analysis
+
+We generated a dataset in the `radpainter` format to be used by
+[fineRADstructure](https://github.com/millanek/fineRADstructure) using
+`populations`.
+
+``` bash
+populations -P ./05.Stacks -O ./07.Population_genetics/fineRadStructure -M ./popmap4.txt -t 4 -p 9 -r 0.9 --max_obs_het 0.6 --min_maf 0.05 --radpainter
+```
+
+Then we run the analysis as indicated in the manual
+[here](http://cichlid.gurdon.cam.ac.uk/fineRADstructure.html).
+
+``` bash
+cd ~/Desktop/biogeography/07.Population_genetics/fineRadStructure
+RADpainter paint populations.haps.radpainter
+finestructure -x 300000 -y 300000 -z 3000 populations.haps_chunks.out populations.haps_chunks.mcmc.xml
+finestructure -m T -x 300000 populations.haps_chunks.out populations.haps_chunks.mcmc.xml populations.haps_chunks.mcmcTree.xml
+```
+
+Results are plotted using the `fineRADstructurePlot.R` script that is
+installed with the program.
