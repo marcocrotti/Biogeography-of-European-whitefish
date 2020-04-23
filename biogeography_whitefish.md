@@ -577,5 +577,3 @@ ggplot() + theme.pca() +
   stat_density(data = bwa_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") + 
   ylim(0,3) + labs(x = "Weir & Cockerham Fst", y = "Density")
 ```
-
-Katia sei bellissima \<3
