@@ -1,7 +1,7 @@
 Biogeography of European whitefish
 ================
 Marco Crotti
-20 April, 2020
+23 April, 2020
 
 ## Pipeline for UK whitefish biogeography project using ddRADseq
 
@@ -124,7 +124,7 @@ We then use the `filter_hwe_by_pop.pl` script from the
 that are not in HWE within populations.
 
 ``` bash
-./filter_hwe_by_pop.pl -v ./05.Stacks_/filtered.maf5.recode.vcf -p ./popmap_biogeography2.txt -o ./05.Stacks/filtered.hwe.maf5
+./filter_hwe_by_pop.pl -v ./05.Stacks/filtered.maf5.recode.vcf -p ./popmap_biogeography2.txt -o ./05.Stacks/filtered.hwe.maf5
 ```
 
 We found no loci out of HWE. Next, following an example from `dDocent`,
@@ -132,7 +132,7 @@ we look for individuals with lots of missing data and exclude from the
 vcf file.
 
 ``` bash
-vcftools --vcf ./5.Stacks_ref2/filtered.hwe.recode.vcf --missing-indv
+vcftools --vcf ./05.Stacks/filtered.hwe.recode.vcf --missing-indv
 mawk '$5 > 0.9' out.imiss | cut -f1 > lowDP.indv
 vcftools --vcf ./05.Stacks/filtered.hwe.maf5.recode.vcf --remove lowDP.indv --recode --recode-INFO-all --out ./05.Stacks/filtered.final.maf5
 ```
@@ -144,10 +144,50 @@ quality SNPs.
 
 ##### Genetic diversity
 
-##### Allelic richness
+We calculated expected and observed heterozygosity, and nucleotide
+diversity using `populations`. We extracted the loci name from the final
+vcf, and used them as a whitelist.
 
 ``` bash
-cd ~/Desktop/biogeography/7.Population_genetics/genetic_diversity
+cd ~/Desktop/biogeography/07.Population_genetics/genetic_diversity
+
+cut -f 3 filtered.final.maf5.recode.vcf | tail -n +16 | cut -f 1 -d":" > whitelist.txt
+
+cd ~/Desktop/biogeography/
+
+populations -P ./05.Stacks -O ./07.Population_genetics/genetic_diversity --whitelist ./07.Population_genetics/genetic_diversity/whitelist.txt -M ./vcf_pop_file.txt -t 4 -p 8 -r 0.667 --max_obs_het 0.6 --min_maf 0.05 --smooth --vcf --bootstrap
+```
+
+##### Allelic richness
+
+Rarefied allelic richness was calculated in the R package `hierfstat`.
+We converted the final vcf to structure format using **PGDSpider**,
+imported the data into R using `adegenet`.
+
+``` r
+library(adegenet); library(hierfstat)
+
+setwd("~/Desktop/biogeography/07.Population_genetics/genetic_diversity/")
+
+genind1 <- read.structure("populations.snps.str", n.ind = 91, n.loc = 41929, 
+                          onerowperind = FALSE, col.lab = 1, 
+                          NA.char = "-9", ask = FALSE, 
+                          row.marknames = 1, quiet = FALSE,col.pop = 2)  
+whitefish.hfstat <- genind2hierfstat(genind1, pop = genind1$pop)
+
+AR <- allelic.richness(whitefish.hfstat, min.n = 3)
+
+alp.rich <- mean(na.omit(AR$Ar[,1]))
+bal.rich <- mean(na.omit(AR$Ar[,2]))
+bwa.rich <- mean(na.omit(AR$Ar[,3]))
+eck.rich <- mean(na.omit(AR$Ar[,4]))
+nor.rich <- mean(na.omit(AR$Ar[,5]))
+hwa.rich <- mean(na.omit(AR$Ar[,6]))
+lte.rich <- mean(na.omit(AR$Ar[,7]))
+lom.rich <- mean(na.omit(AR$Ar[,8]))
+rta.rich <- mean(na.omit(AR$Ar[,9]))
+rus.rich <- mean(na.omit(AR$Ar[,10]))
+uwa.rich <- mean(na.omit(AR$Ar[,11]))
 ```
 
 #### Convert the vcf file to phylip
@@ -264,3 +304,276 @@ finestructure -m T -x 300000 populations.haps_chunks.out populations.haps_chunks
 
 Results are plotted using the `fineRADstructurePlot.R` script that is
 installed with the program.
+
+#### Principal component analysis using SNPRelate
+
+As the title indicates, a pca was run using the R Bioconductor package
+`SNPRelate` (a good vignette is found
+[here](http://corearray.sourceforge.net/tutorials/SNPRelate/)).
+
+``` r
+#### Principal component analysis ####
+
+# Packages ----
+library(SNPRelate);library(ggplot2);library(tidyverse);library(gridExtra)
+
+# Set working directory ----
+setwd("~/Desktop/biogeography")
+
+# Functions ----
+
+# Consistent plot aesthetics for PCA
+theme.pca <- function() {
+  theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.background = element_rect(colour="black",fill="white", size=1),
+          axis.text = element_text(size=16, color = "black"),
+          axis.ticks = element_line(size = 0.5, colour = "black"),
+          axis.ticks.length = unit(3, "mm"),
+          axis.title.y = element_text(size = 30),
+          axis.title.x = element_text(size = 30),
+          axis.text.x = element_text(size=20),
+          axis.text.y = element_text(size=20),
+          legend.title = element_text(size = 20),
+          legend.text = element_text(size = 20))
+}
+
+# Import vcf file and popdata file ----
+vcf.fn <- "./07.Population_genetics/PCA/filtered.final.maf5.recode.vcf"
+snpgdsVCF2GDS(vcf.fn, "./07.Population_genetics/PCA/test.final.maf5.gds", method="biallelic.only")
+snpgdsSummary("./07.Population_genetics/PCA/test.final.maf5.gds")
+genofile <- snpgdsOpen("./07.Population_genetics/PCA/test.final.maf5.gds")
+
+
+pop_data <- read.table("vcf_pop_file.txt",header=FALSE)
+
+
+# Start analysis ----
+set.seed(1000)  # for reproducibility
+
+# pca with all SNPs
+pca <- snpgdsPCA(genofile, num.thread=2, autosome.only = FALSE)  
+
+# variance proportion (%)
+pc.percent <- pca$varprop*100
+head(round(pc.percent, 2))
+
+# Manipulate results ----
+# make a data.frame
+tab <- data.frame(sample.id = pca$sample.id,
+                  EV1 = pca$eigenvect[,1],    # the first eigenvector
+                  EV2 = pca$eigenvect[,2],
+                  EV3 = pca$eigenvect[,3],
+                  EV4 = pca$eigenvect[,4],
+                  EV5 = pca$eigenvect[,5],
+                  EV6 = pca$eigenvect[,6],
+                  EV7 = pca$eigenvect[,7],# the second eigenvector
+                  stringsAsFactors = FALSE)
+head(tab)
+# add population data
+tab[,9] <- pop_data$V2
+colnames(tab)[9] <- "Population"
+
+# reorder lake names
+tab$Population <- factor(tab$Population, levels = c("NOR","BAL","RUS","LOM","ECK","ALP","LTE","HAW","RTA","BWA","UWA"))
+
+# Plot results ----
+
+cols <- c("HAW"="#DC8C91","BWA"="#e3655b","ECK"="#74BEE9","LOM"="#2372CD","RTA"="firebrick1","LTE"="gold1","UWA"="firebrick4","ALP"="#874000","NOR"="#b08ea2","BAL"="#6b9080","RUS"="#464e47")
+
+#### Principal component analysis ####
+
+# Packages ----
+library(SNPRelate);library(ggplot2);library(tidyverse);library(gridExtra);library(MASS);library(viridis)
+
+# Set working directory ----
+setwd("~/Desktop/biogeography")
+
+# Functions ----
+
+# Consistent plot aesthetics for PCA
+theme.pca <- function() {
+  theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.background = element_rect(colour="black",fill="white", size=1),
+          axis.text = element_text(size=16, color = "black"),
+          axis.ticks = element_line(size = 0.5, colour = "black"),
+          axis.ticks.length = unit(3, "mm"),
+          axis.title.y = element_text(size = 30),
+          axis.title.x = element_text(size = 30),
+          axis.text.x = element_text(size=20),
+          axis.text.y = element_text(size=20),
+          legend.title = element_text(size = 20),
+          legend.text = element_text(size = 20))
+}
+
+# Import vcf file and popdata file ----
+vcf.fn <- "./7.Population_genetics/PCA/filtered.final.maf5.recode.vcf"
+snpgdsVCF2GDS(vcf.fn, "./7.Population_genetics/PCA/test.final.maf5.gds", method="biallelic.only")
+snpgdsSummary("./7.Population_genetics/PCA/test.final.maf5.gds")
+genofile <- snpgdsOpen("./7.Population_genetics/PCA/test.final.maf5.gds")
+
+
+pop_data <- read.table("vcf_pop_file.txt",header=FALSE)
+
+
+# Start analysis ----
+set.seed(1000)  # for reproducibility
+
+# option to filter SNPs for LD before pca
+snpset <- snpgdsLDpruning(genofile, ld.threshold=0.2,autosome.only = FALSE)  
+snpset.id <- unlist(snpset)
+pca <- snpgdsPCA(genofile, num.thread=2, snp.id=snpset.id, autosome.only = FALSE)
+
+# pca with all SNPs
+pca <- snpgdsPCA(genofile, num.thread=2, autosome.only = FALSE)  
+
+# variance proportion (%)
+pc.percent <- pca$varprop*100
+head(round(pc.percent, 2))
+
+# Manipulate results ----
+# make a data.frame
+tab <- data.frame(sample.id = pca$sample.id,
+                  EV1 = pca$eigenvect[,1],    # the first eigenvector
+                  EV2 = pca$eigenvect[,2],
+                  EV3 = pca$eigenvect[,3],
+                  EV4 = pca$eigenvect[,4],
+                  EV5 = pca$eigenvect[,5],
+                  EV6 = pca$eigenvect[,6],
+                  EV7 = pca$eigenvect[,7],# the second eigenvector
+                  stringsAsFactors = FALSE)
+head(tab)
+# add population data
+tab[,9] <- pop_data$V2
+colnames(tab)[9] <- "Population"
+
+# reorder lake names
+tab$Population <- factor(tab$Population, levels = c("NOR","BAL","RUS","LOM","ECK","ALP","LTE","HAW","RTA","BWA","UWA"))
+
+# Plot results ----
+
+cols <- c("HAW"="#DC8C91","BWA"="#e3655b","ECK"="#74BEE9","LOM"="#2372CD","RTA"="firebrick1","LTE"="gold1","UWA"="firebrick4","ALP"="#874000","NOR"="#b08ea2","BAL"="#6b9080","RUS"="#464e47")
+
+# PC1 and PC2
+ggplot(tab, aes(x=EV1, y=EV2,col=Population)) + geom_point(size=6) + labs(x="EV1 22.21%", y="EV2 18.80%") + theme_bw() + scale_color_manual(values=cols) +
+  theme(axis.title.y = element_text(size = 30),axis.title.x = element_text(size = 30),axis.text.x = element_text(size=21),axis.text.y = element_text(size=21)) +
+  theme(legend.title = element_text(size=20)) + theme(legend.text = element_text(size=18))
+
+# PC1 and PC3
+ggplot(tab, aes(x=EV1, y=EV3,col=Population)) + geom_point(size=6) + labs(x="EV1 22.21%", y="EV2 9.77%") + theme_bw() + scale_color_manual(values=cols) +
+  theme(axis.title.y = element_text(size = 30),axis.title.x = element_text(size = 30),axis.text.x = element_text(size=21),axis.text.y = element_text(size=21)) +
+  theme(legend.title = element_text(size=20)) + theme(legend.text = element_text(size=18))
+```
+
+#### Genome-wide FST
+
+We calculated genome-wide FST across populations using `vcftools`, and
+then visualised the results in R.
+
+``` bash
+cd ~/Desktop/biogeography/07.Population_genetics/Fst 
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_ALP_Fst --weir-fst-pop lom.txt --weir-fst-pop alp.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_BAL_Fst --weir-fst-pop lom.txt --weir-fst-pop bal.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_NOR_Fst --weir-fst-pop lom.txt --weir-fst-pop nor.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_LTE_Fst --weir-fst-pop lom.txt --weir-fst-pop lte.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_RTA_Fst --weir-fst-pop lom.txt --weir-fst-pop rta.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_BWA_Fst --weir-fst-pop lom.txt --weir-fst-pop bwa.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_UWA_Fst --weir-fst-pop lom.txt --weir-fst-pop uwa.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out LOM_ECK_Fst --weir-fst-pop lom.txt --weir-fst-pop eck.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out ECK_ALP_Fst --weir-fst-pop eck.txt --weir-fst-pop alp.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out ECK_BAL_Fst --weir-fst-pop eck.txt --weir-fst-pop bal.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out ECK_NOR_Fst --weir-fst-pop eck.txt --weir-fst-pop nor.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out ECK_LTE_Fst --weir-fst-pop eck.txt --weir-fst-pop lte.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out ECK_RTA_Fst --weir-fst-pop eck.txt --weir-fst-pop rta.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out ECK_BWA_Fst --weir-fst-pop eck.txt --weir-fst-pop bwa.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out ECK_UWA_Fst --weir-fst-pop eck.txt --weir-fst-pop uwa.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out BAL_ALP_Fst --weir-fst-pop bal.txt --weir-fst-pop alp.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out BAL_NOR_Fst --weir-fst-pop bal.txt --weir-fst-pop nor.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out BAL_LTE_Fst --weir-fst-pop bal.txt --weir-fst-pop lte.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out BAL_RTA_Fst --weir-fst-pop bal.txt --weir-fst-pop rta.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out BAL_BWA_Fst --weir-fst-pop bal.txt --weir-fst-pop bwa.txt --fst-window-size 1000000
+
+vcftools --vcf ../filtered.final.maf5.recode.vcf --out BAL_UWA_Fst --weir-fst-pop bal.txt --weir-fst-pop uwa.txt --fst-window-size 1000000
+```
+
+``` r
+library(tidyverse)
+setwd("~/Desktop/biogeography/07.Population_genetics/Fst")
+lom_alp <- read.table("LOM_ALP_Fst.windowed.weir.fst", header = TRUE)
+lom_bal <- read.table("LOM_BAL_Fst.windowed.weir.fst", header = TRUE)
+lom_nor <- read.table("LOM_NOR_Fst.windowed.weir.fst", header = TRUE)
+lom_lte <- read.table("LOM_LTE_Fst.windowed.weir.fst", header = TRUE)
+lom_rta <- read.table("LOM_RTA_Fst.windowed.weir.fst", header = TRUE)
+lom_uwa <- read.table("LOM_UWA_Fst.windowed.weir.fst", header = TRUE)
+lom_bwa <- read.table("LOM_BWA_Fst.windowed.weir.fst", header = TRUE)
+lom_eck <- read.table("LOM_ECK_Fst.windowed.weir.fst", header = TRUE)
+eck_alp <- read.table("ECK_ALP_Fst.windowed.weir.fst", header = TRUE)
+eck_bal <- read.table("ECK_BAL_Fst.windowed.weir.fst", header = TRUE)
+eck_nor <- read.table("ECK_NOR_Fst.windowed.weir.fst", header = TRUE)
+eck_lte <- read.table("ECK_LTE_Fst.windowed.weir.fst", header = TRUE)
+eck_rta <- read.table("ECK_RTA_Fst.windowed.weir.fst", header = TRUE)
+eck_uwa <- read.table("ECK_UWA_Fst.windowed.weir.fst", header = TRUE)
+eck_bwa <- read.table("ECK_BWA_Fst.windowed.weir.fst", header = TRUE)
+lom_bal <- read.table("LOM_BAL_Fst.windowed.weir.fst", header = TRUE)
+eck_bal <- read.table("ECK_BAL_Fst.windowed.weir.fst", header = TRUE)
+alp_bal <- read.table("BAL_ALP_Fst.windowed.weir.fst", header = TRUE)
+nor_bal <- read.table("BAL_NOR_Fst.windowed.weir.fst", header = TRUE)
+lte_bal <- read.table("BAL_LTE_Fst.windowed.weir.fst", header = TRUE)
+rta_bal <- read.table("BAL_RTA_Fst.windowed.weir.fst", header = TRUE)
+bwa_bal <- read.table("BAL_BWA_Fst.windowed.weir.fst", header = TRUE)
+uwa_bal <- read.table("BAL_UWA_Fst.windowed.weir.fst", header = TRUE)
+
+# Using Scottish populations as reference
+ggplot() + theme.pca() +
+  stat_density(data = lom_alp, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#874000") +
+  stat_density(data = lom_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#6b9080") +
+  stat_density(data = lom_nor, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#b08ea2") +
+  stat_density(data = lom_lte, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "gold1") +
+  stat_density(data = lom_rta, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
+  stat_density(data = lom_uwa, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
+  stat_density(data = lom_bwa, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
+  stat_density(data = lom_eck, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#2372CD") +
+  stat_density(data = eck_alp, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#874000") +
+  stat_density(data = eck_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#6b9080") +
+  stat_density(data = eck_nor, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#b08ea2") +
+  stat_density(data = eck_lte, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "gold1") +
+  stat_density(data = eck_rta, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
+  stat_density(data = eck_uwa, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
+  stat_density(data = eck_bwa, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") + 
+  ylim(0,3) + labs(x = "Weir & Cockerham Fst", y = "Density")
+
+# Using Baltic population as reference
+ggplot() + theme.pca() +
+  stat_density(data = lom_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#2372CD") +
+  stat_density(data = eck_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#2372CD") +
+  stat_density(data = alp_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#874000") +
+  stat_density(data = nor_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#b08ea2") +
+  stat_density(data = lte_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "gold1") +
+  stat_density(data = rta_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
+  stat_density(data = uwa_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
+  stat_density(data = bwa_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") + 
+  ylim(0,3) + labs(x = "Weir & Cockerham Fst", y = "Density")
+```
