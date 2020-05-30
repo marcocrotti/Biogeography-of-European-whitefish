@@ -2,7 +2,10 @@
 title: "Biogeography of European whitefish"
 author: "Marco Crotti"
 date: "`r format(Sys.time(), '%d %B, %Y')`"
-output: github_document
+output: 
+  github_document:
+    toc: true
+    toc_depth: 5
 ---
 
 ```{r setup, include=FALSE}
