@@ -1,36 +1,39 @@
 Biogeography of European whitefish
 ================
 Marco Crotti
-30 May, 2020
+26 June, 2020
 
-  - [Pipeline for UK whitefish biogeography project using
-    ddRADseq](#pipeline-for-uk-whitefish-biogeography-project-using-ddradseq)
-      - [Set up working environment](#set-up-working-environment)
-      - [Preparing the data for population genomics
-        analyses](#preparing-the-data-for-population-genomics-analyses)
-          - [01. Demultiplex raw reads](#demultiplex-raw-reads)
-          - [02. <span>Trimmomatic</span>
-            filtering](#trimmomatic-filtering)
-          - [03. Align to European whitefish genome
-            assembly](#align-to-european-whitefish-genome-assembly)
-          - [04. Build Stacks catalog](#build-stacks-catalog)
-      - [Population genomics and phylogenetics
-        analyses](#population-genomics-and-phylogenetics-analyses)
-          - [Generate a vcf file using
-            <span>populations</span>](#generate-a-vcf-file-using-populations)
-              - [Filter the vcf file](#filter-the-vcf-file)
-          - [Genetic diversity and allelic
-            richness](#genetic-diversity-and-allelic-richness)
-              - [Genetic diversity](#genetic-diversity)
-              - [Allelic richness](#allelic-richness)
-          - [Convert the vcf file to
-            phylip](#convert-the-vcf-file-to-phylip)
-          - [Admxiture analysis](#admxiture-analysis)
-          - [DAPC analysis in adegenet](#dapc-analysis-in-adegenet)
-          - [fineRADstructure analysis](#fineradstructure-analysis)
-          - [Principal component analysis using
-            SNPRelate](#principal-component-analysis-using-snprelate)
-          - [Genome-wide FST](#genome-wide-fst)
+  - [This is a prova](#this-is-a-prova)
+      - [Pipeline for UK whitefish biogeography project using
+        ddRADseq](#pipeline-for-uk-whitefish-biogeography-project-using-ddradseq)
+          - [Set up working environment](#set-up-working-environment)
+          - [Preparing the data for population genomics
+            analyses](#preparing-the-data-for-population-genomics-analyses)
+              - [01. Demultiplex raw reads](#demultiplex-raw-reads)
+              - [02. <span>Trimmomatic</span>
+                filtering](#trimmomatic-filtering)
+              - [03. Align to European whitefish genome
+                assembly](#align-to-european-whitefish-genome-assembly)
+              - [04. Build Stacks catalog](#build-stacks-catalog)
+          - [Population genomics and phylogenetics
+            analyses](#population-genomics-and-phylogenetics-analyses)
+              - [Generate a vcf file using
+                <span>populations</span>](#generate-a-vcf-file-using-populations)
+                  - [Filter the vcf file](#filter-the-vcf-file)
+              - [Genetic diversity and allelic
+                richness](#genetic-diversity-and-allelic-richness)
+                  - [Genetic diversity](#genetic-diversity)
+                  - [Allelic richness](#allelic-richness)
+              - [Convert the vcf file to
+                phylip](#convert-the-vcf-file-to-phylip)
+              - [Admxiture analysis](#admxiture-analysis)
+              - [DAPC analysis in adegenet](#dapc-analysis-in-adegenet)
+              - [fineRADstructure analysis](#fineradstructure-analysis)
+              - [Principal component analysis using
+                SNPRelate](#principal-component-analysis-using-snprelate)
+              - [Genome-wide FST](#genome-wide-fst)
+
+# This is a prova
 
 ## Pipeline for UK whitefish biogeography project using ddRADseq
 
