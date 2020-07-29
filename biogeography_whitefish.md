@@ -1,7 +1,7 @@
 Biogeography of European whitefish
 ================
 Marco Crotti
-30 May, 2020
+29 July, 2020
 
   - [Pipeline for UK whitefish biogeography project using
     ddRADseq](#pipeline-for-uk-whitefish-biogeography-project-using-ddradseq)
@@ -31,6 +31,7 @@ Marco Crotti
           - [Principal component analysis using
             SNPRelate](#principal-component-analysis-using-snprelate)
           - [Genome-wide FST](#genome-wide-fst)
+          - [Dsuite analysis](#dsuite-analysis)
 
 ## Pipeline for UK whitefish biogeography project using ddRADseq
 
@@ -267,6 +268,8 @@ Now run the analysis.
 cd ./07.Population_genetics/admixture
 sh ./run_admixture_loop.sh filtered.final.ped
 grep -h CV ./results/log*.out
+
+# plot results in R.
 ```
 
 #### DAPC analysis in adegenet
@@ -301,7 +304,7 @@ xval1 <- xvalDapc(tab(genlight1, NA.method="mean"), groups$grp, n.pca.max = 90,
 
 dapc1 <- dapc(genlight1, pop = groups$grp, n.pca=10, n.da = 7)  # run dapc
 
-# plot the results
+# plot the results (Figure S2)
 posterior1 <- data.frame(dapc1$posterior)
 colnames(posterior1) <- c("alp","lte","lom","haw","nor","bwa","bal")
 cols <- c("alp"="#874000","lte"="gold1","lom"="#2372CD","haw"="#DC8C91","nor"="#b08ea2","bwa"="#e3655b","bal"="#6b9080")
@@ -318,7 +321,7 @@ We generated a dataset in the `radpainter` format to be used by
 `populations`.
 
 ``` bash
-populations -P ./05.Stacks -O ./07.Population_genetics/fineRadStructure -M ./popmap4.txt -t 4 -p 9 -r 0.9 --max_obs_het 0.6 --min_maf 0.05 --radpainter
+populations -P ./05.Stacks -O ./07.Population_genetics/fineRadStructure -M ./popmap_radstructure.txt --whitelist ./05.Stacks/whitelist -t 4 -p 9 -r 0.9 --max_obs_het 0.6 --min_maf 0.05 --radpainter
 ```
 
 Then we run the analysis as indicated in the manual
@@ -341,76 +344,6 @@ As the title indicates, a pca was run using the R Bioconductor package
 [here](http://corearray.sourceforge.net/tutorials/SNPRelate/)).
 
 ``` r
-#### Principal component analysis ####
-
-# Packages ----
-library(SNPRelate);library(ggplot2);library(tidyverse);library(gridExtra)
-
-# Set working directory ----
-setwd("~/Desktop/biogeography")
-
-# Functions ----
-
-# Consistent plot aesthetics for PCA
-theme.pca <- function() {
-  theme_bw() +
-    theme(panel.grid.minor = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.background = element_rect(colour="black",fill="white", size=1),
-          axis.text = element_text(size=16, color = "black"),
-          axis.ticks = element_line(size = 0.5, colour = "black"),
-          axis.ticks.length = unit(3, "mm"),
-          axis.title.y = element_text(size = 30),
-          axis.title.x = element_text(size = 30),
-          axis.text.x = element_text(size=20),
-          axis.text.y = element_text(size=20),
-          legend.title = element_text(size = 20),
-          legend.text = element_text(size = 20))
-}
-
-# Import vcf file and popdata file ----
-vcf.fn <- "./07.Population_genetics/PCA/filtered.final.maf5.recode.vcf"
-snpgdsVCF2GDS(vcf.fn, "./07.Population_genetics/PCA/test.final.maf5.gds", method="biallelic.only")
-snpgdsSummary("./07.Population_genetics/PCA/test.final.maf5.gds")
-genofile <- snpgdsOpen("./07.Population_genetics/PCA/test.final.maf5.gds")
-
-
-pop_data <- read.table("vcf_pop_file.txt",header=FALSE)
-
-
-# Start analysis ----
-set.seed(1000)  # for reproducibility
-
-# pca with all SNPs
-pca <- snpgdsPCA(genofile, num.thread=2, autosome.only = FALSE)  
-
-# variance proportion (%)
-pc.percent <- pca$varprop*100
-head(round(pc.percent, 2))
-
-# Manipulate results ----
-# make a data.frame
-tab <- data.frame(sample.id = pca$sample.id,
-                  EV1 = pca$eigenvect[,1],    # the first eigenvector
-                  EV2 = pca$eigenvect[,2],
-                  EV3 = pca$eigenvect[,3],
-                  EV4 = pca$eigenvect[,4],
-                  EV5 = pca$eigenvect[,5],
-                  EV6 = pca$eigenvect[,6],
-                  EV7 = pca$eigenvect[,7],# the second eigenvector
-                  stringsAsFactors = FALSE)
-head(tab)
-# add population data
-tab[,9] <- pop_data$V2
-colnames(tab)[9] <- "Population"
-
-# reorder lake names
-tab$Population <- factor(tab$Population, levels = c("NOR","BAL","RUS","LOM","ECK","ALP","LTE","HAW","RTA","BWA","UWA"))
-
-# Plot results ----
-
-cols <- c("HAW"="#DC8C91","BWA"="#e3655b","ECK"="#74BEE9","LOM"="#2372CD","RTA"="firebrick1","LTE"="gold1","UWA"="firebrick4","ALP"="#874000","NOR"="#b08ea2","BAL"="#6b9080","RUS"="#464e47")
-
 #### Principal component analysis ####
 
 # Packages ----
@@ -461,7 +394,7 @@ pca <- snpgdsPCA(genofile, num.thread=2, autosome.only = FALSE)
 
 # variance proportion (%)
 pc.percent <- pca$varprop*100
-head(round(pc.percent, 2))
+pc.percent <- head(round(pc.percent, 2))
 
 # Manipulate results ----
 # make a data.frame
@@ -487,14 +420,36 @@ tab$Population <- factor(tab$Population, levels = c("NOR","BAL","RUS","LOM","ECK
 cols <- c("HAW"="#DC8C91","BWA"="#e3655b","ECK"="#74BEE9","LOM"="#2372CD","RTA"="firebrick1","LTE"="gold1","UWA"="firebrick4","ALP"="#874000","NOR"="#b08ea2","BAL"="#6b9080","RUS"="#464e47")
 
 # PC1 and PC2
-ggplot(tab, aes(x=EV1, y=EV2,col=Population)) + geom_point(size=6) + labs(x="EV1 22.21%", y="EV2 18.80%") + theme_bw() + scale_color_manual(values=cols) +
+ggplot(tab, aes(x=EV1, y=EV2,col=Population)) + geom_point(size=6) + labs(x=paste("EV1",round(pc.percent, 2)[1],"%"), y = paste("EV2", round(pc.percent, 2)[2], "%")) + theme_bw() + scale_color_manual(values=cols) +
   theme(axis.title.y = element_text(size = 30),axis.title.x = element_text(size = 30),axis.text.x = element_text(size=21),axis.text.y = element_text(size=21)) +
   theme(legend.title = element_text(size=20)) + theme(legend.text = element_text(size=18))
 
 # PC1 and PC3
-ggplot(tab, aes(x=EV1, y=EV3,col=Population)) + geom_point(size=6) + labs(x="EV1 22.21%", y="EV2 9.77%") + theme_bw() + scale_color_manual(values=cols) +
+ggplot(tab, aes(x=EV1, y=EV3,col=Population)) + geom_point(size=6) + labs(x=paste("EV1",round(pc.percent, 2)[1],"%"), y = paste("EV3", round(pc.percent, 2)[2], "%")) + theme_bw() + scale_color_manual(values=cols) +
   theme(axis.title.y = element_text(size = 30),axis.title.x = element_text(size = 30),axis.text.x = element_text(size=21),axis.text.y = element_text(size=21)) +
   theme(legend.title = element_text(size=20)) + theme(legend.text = element_text(size=18))
+
+
+
+# Calculate the SNP correlations between eigenvactors and SNP genotypes:
+chr <- read.gdsn(index.gdsn(genofile, "snp.chromosome"))
+chr2 <- parse_number(chr)
+CORR <- snpgdsPCACorr(pca, genofile, eig.which=1:4)
+
+savepar <- par(mfrow=c(3,1), mai=c(0.3, 0.55, 0.1, 0.25))
+for (i in 1:3)
+{
+  plot(abs(CORR$snpcorr[i,]), ylim=c(0,1), xlab="", ylab=paste("PC", i),
+       col=chr2, pch="+")
+}
+
+# plot Figure S1
+savepar <- par(mfrow=c(3,1), mai=c(0.3, 0.55, 0.1, 0.25))
+for (i in 1:3)
+{
+  plot(CORR$snpcorr[i,], ylim=c(-1,1), xlab="", ylab=paste("PC", i),
+       col=chr2, pch="+")
+}
 ```
 
 #### Genome-wide FST
@@ -575,7 +530,7 @@ rta_bal <- read.table("BAL_RTA_Fst.windowed.weir.fst", header = TRUE)
 bwa_bal <- read.table("BAL_BWA_Fst.windowed.weir.fst", header = TRUE)
 uwa_bal <- read.table("BAL_UWA_Fst.windowed.weir.fst", header = TRUE)
 
-# Using Scottish populations as reference
+# Using Scottish populations as reference (Figure S5)
 ggplot() + theme.pca() +
   stat_density(data = lom_alp, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#874000") +
   stat_density(data = lom_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#6b9080") +
@@ -594,7 +549,7 @@ ggplot() + theme.pca() +
   stat_density(data = eck_bwa, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") + 
   ylim(0,3) + labs(x = "Weir & Cockerham Fst", y = "Density")
 
-# Using Baltic population as reference
+# Using Baltic population as reference (Figure S5)
 ggplot() + theme.pca() +
   stat_density(data = lom_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#2372CD") +
   stat_density(data = eck_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "#2372CD") +
@@ -605,4 +560,84 @@ ggplot() + theme.pca() +
   stat_density(data = uwa_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") +
   stat_density(data = bwa_bal, aes(x = WEIGHTED_FST), size = 2,geom="line", colour = "firebrick1") + 
   ylim(0,3) + labs(x = "Weir & Cockerham Fst", y = "Density")
+
+
+# calculate and plot z-Fst across 1 Mb windows
+
+# define windows to help with plotting
+lom_alp$window <- 1:nrow(lom_alp)
+lom_bal$window <- 1:nrow(lom_bal)
+lom_nor$window <- 1:nrow(lom_nor)
+lom_lte$window <- 1:nrow(lom_lte)
+lom_rta$window <- 1:nrow(lom_rta)
+
+# calculate z-fst
+lom_alp$z_fst <- (lom_alp$WEIGHTED_FST - mean(lom_alp$WEIGHTED_FST)) /sd(lom_alp$WEIGHTED_FST)
+lom_bal$z_fst <- (lom_bal$WEIGHTED_FST - mean(lom_bal$WEIGHTED_FST)) /sd(lom_bal$WEIGHTED_FST)
+lom_nor$z_fst <- (lom_nor$WEIGHTED_FST - mean(lom_nor$WEIGHTED_FST)) /sd(lom_nor$WEIGHTED_FST)
+lom_lte$z_fst <- (lom_lte$WEIGHTED_FST - mean(lom_lte$WEIGHTED_FST)) /sd(lom_lte$WEIGHTED_FST)
+lom_rta$z_fst <- (lom_rta$WEIGHTED_FST - mean(lom_rta$WEIGHTED_FST)) /sd(lom_rta$WEIGHTED_FST)
+
+# plot Figure S6
+nCHR <- length(unique(lom_alp$CHROM))
+
+lom_alp_plot <- ggplot(data = filter(lom_alp, N_VARIANTS >= 5), aes(x = window, y = z_fst, colour = as.factor(CHROM))) + 
+  geom_point(size = 3) + geom_jitter(width = 0.1) + theme_bw() +
+  scale_color_manual(values = rep(c("gray80", "#183059"), nCHR)) + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45)) + 
+  geom_hline(yintercept = 3, linetype = 'dashed') +
+  ylim(0,3.5) 
+
+lom_nor_plot <- ggplot(data = filter(lom_nor, N_VARIANTS >= 5), aes(x = window, y = z_fst, colour = as.factor(CHROM))) + 
+  geom_point(size = 3) + geom_jitter(width = 0.1) + theme_bw() +
+  scale_color_manual(values = rep(c("gray80", "#183059"), nCHR)) + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45)) + 
+  geom_hline(yintercept = 3, linetype = 'dashed') +
+  ylim(0,3.5) 
+
+lom_bal_plot <- ggplot(data = filter(lom_bal, N_VARIANTS >= 5), aes(x = window, y = z_fst, colour = as.factor(CHROM))) + 
+  geom_point(size = 3) + geom_jitter(width = 0.1) + theme_bw() +
+  scale_color_manual(values = rep(c("gray80", "#183059"), nCHR)) + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45)) + 
+  geom_hline(yintercept = 3, linetype = 'dashed') +
+  ylim(0,3.5) 
+
+lom_lte_plot <- ggplot(data = filter(lom_lte, N_VARIANTS >= 5), aes(x = window, y = z_fst, colour = as.factor(CHROM))) + 
+  geom_point(size = 3) + geom_jitter(width = 0.1) + theme_bw() +
+  scale_color_manual(values = rep(c("gray80", "#183059"), nCHR)) + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45)) + 
+  geom_hline(yintercept = 3, linetype = 'dashed') +
+  ylim(0,3.5) 
+
+lom_rta_plot <- ggplot(data = filter(lom_rta, N_VARIANTS >= 5), aes(x = window, y = z_fst, colour = as.factor(CHROM))) + 
+  geom_point(size = 3) + geom_jitter(width = 0.1) + theme_bw() +
+  scale_color_manual(values = rep(c("gray80", "#183059"), nCHR)) + theme(legend.position = "none") +
+  theme(axis.text.x = element_text(angle = 45)) + 
+  geom_hline(yintercept = 3, linetype = 'dashed') +
+  ylim(0,3.5) 
+
+library(patchwork)
+
+lom_nor_plot / 
+  lom_alp_plot /
+  lom_bal_plot /
+  lom_lte_plot /
+  lom_rta_plot
+```
+
+#### Dsuite analysis
+
+You can find the `Dsuite` program
+[here](https://github.com/millanek/Dsuite). We only used the Loch Lomond
+population from Scotland, and Red Tarn from England, and excluded the
+Russian population due to high missing data. We remove the unwanted
+samples and create the `reduced.recode.vcf` file. We also subsample the
+ML tree obtained from RAxML for the Dsuite analysis.
+
+``` bash
+cd ~/Desktop/biogeography/07.Population_genetics/Dsuite/Build
+./Dsuite Dtrios -t reduced.tre reduced.recode.vcf reduced.txt 
+ruby plot_d.rb reduced__Dmin.txt species_order_reduced.txt 0.2 reduced_Dmin.svg
+ruby plot_d.rb reduced__BBAA.txt species_order_reduced.txt 0.2 reduced_BBAA.svg
+ruby plot_d.rb reduced__tree.txt species_order_reduced.txt 0.2 reduced_tree.svg  # Figure S7
 ```
