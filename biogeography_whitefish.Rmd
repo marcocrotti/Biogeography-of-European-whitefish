@@ -578,16 +578,3 @@ lom_nor_plot /
 ```
 
 
-#### Dsuite analysis
-
-You can find the `Dsuite` program [here](https://github.com/millanek/Dsuite). We only used the Loch Lomond population from Scotland, and Red Tarn from England, and excluded the Russian population due to high missing data. We remove the unwanted samples and create the `reduced.recode.vcf` file. We also subsample the ML tree obtained from RAxML for the Dsuite analysis.
-
-```{bash, eval = FALSE}
-cd ~/Desktop/biogeography/07.Population_genetics/Dsuite/Build
-./Dsuite Dtrios -t reduced.tre reduced.recode.vcf reduced.txt 
-ruby plot_d.rb reduced__Dmin.txt species_order_reduced.txt 0.2 reduced_Dmin.svg
-ruby plot_d.rb reduced__BBAA.txt species_order_reduced.txt 0.2 reduced_BBAA.svg
-ruby plot_d.rb reduced__tree.txt species_order_reduced.txt 0.2 reduced_tree.svg  # Figure S7
-```
-
-
