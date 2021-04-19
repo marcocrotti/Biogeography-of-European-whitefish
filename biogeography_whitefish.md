@@ -1,7 +1,7 @@
 Biogeography of European whitefish
 ================
 Marco Crotti
-31 March, 2021
+19 April, 2021
 
   - [Pipeline for UK whitefish biogeography project using
     ddRADseq](#pipeline-for-uk-whitefish-biogeography-project-using-ddradseq)
@@ -31,6 +31,7 @@ Marco Crotti
           - [Principal component analysis using
             SNPRelate](#principal-component-analysis-using-snprelate)
           - [Genome-wide FST](#genome-wide-fst)
+          - [TreeMix](#treemix)
 
 ## Pipeline for UK whitefish biogeography project using ddRADseq
 
@@ -622,4 +623,16 @@ lom_nor_plot /
   lom_bal_plot /
   lom_lte_plot /
   lom_rta_plot
+```
+
+#### TreeMix
+
+We explored and visualised admixture events using TreeMix using the pop
+gen dataset, testing 0-11 migration edges.
+
+``` bash
+for i in {0..11}
+do
+ treemix -i $@ -m $i -o ./results/edge.$i -bootstrap -k 100 > treemix_${i}_log &
+done
 ```
