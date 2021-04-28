@@ -583,7 +583,7 @@ We explored and visualised admixture events using TreeMix using the pop gen data
 ```{bash, eval = FALSE}
 for i in {0..11}
 do
- treemix -i $@ -m $i -o ./results/edge.$i -bootstrap -k 100 > treemix_${i}_log &
+ treemix -i $@ -m $i -o ./results/edge.$i -k 100 > treemix_${i}_log &
 done
 ```
 

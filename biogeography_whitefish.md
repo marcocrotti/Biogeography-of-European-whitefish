@@ -1,7 +1,7 @@
 Biogeography of European whitefish
 ================
 Marco Crotti
-19 April, 2021
+28 April, 2021
 
   - [Pipeline for UK whitefish biogeography project using
     ddRADseq](#pipeline-for-uk-whitefish-biogeography-project-using-ddradseq)
@@ -633,6 +633,6 @@ gen dataset, testing 0-11 migration edges.
 ``` bash
 for i in {0..11}
 do
- treemix -i $@ -m $i -o ./results/edge.$i -bootstrap -k 100 > treemix_${i}_log &
+ treemix -i $@ -m $i -o ./results/edge.$i -k 100 > treemix_${i}_log &
 done
 ```
